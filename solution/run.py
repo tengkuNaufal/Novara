@@ -21,7 +21,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from games import GAME, GAMES, half_video_blocks, require, source_frames  # noqa: E402
-from solution import atd, config as C, features, model, tagging  # noqa: E402
+from solution import atd, broadcast, config as C, features, model, tagging  # noqa: E402
 
 LETTERS = np.array(["H", "A", "D"])
 
@@ -38,6 +38,20 @@ def predict(data_dir=None, verbose=True):
     if verbose:
         print("reading tracking ...")
     track = atd.read_raw(raw, n_frames, pitch)
+    bc_stats = {"broadcast_used": False}
+    if C.USE_BROADCAST:
+        try:
+            b_meta, b_raw, b_hom = require(["atd_meta", "atd_raw", "homography"], GAME, data_dir,
+                                          source="broadcast")
+        except (IOError, OSError, KeyError):
+            b_raw = None
+        if b_raw is not None:
+            if verbose:
+                print("aligning broadcast ...")
+            nb = source_frames("broadcast", GAME)
+            b_track = atd.read_raw(b_raw, nb, pitch)
+            _, bc_stats = broadcast.fill_ball(track, b_track, broadcast.read_valid(b_hom, nb))
+            bc_stats["broadcast_used"] = True
 
     graded = np.zeros(n_frames, dtype=bool)
     for _, first, last in blocks:
@@ -64,6 +78,7 @@ def predict(data_dir=None, verbose=True):
         "smart_tagging_instances": len(events),
     }
     diag.update(tag_summary)
+    diag.update(bc_stats)
     return labels, diag
 
 

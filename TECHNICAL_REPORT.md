@@ -80,11 +80,28 @@ only their dead/alive timing.
 ## 3. Assets used and dropped
 
 - **Used:** tactical ATD (players and ball), tactical Smart Tagging.
-- **Dropped:** broadcast video and ATD. They are not synchronised to the tactical timeline, a
-  third of the frames have no homography, and they would have needed a separate alignment model.
-- **Dropped:** homography and tactical video. Our method works entirely on pitch coordinates,
-  which the ATD already provides. Re-detecting the ball from video is the obvious next step (see
-  §6) but was out of scope.
+- **Used:** broadcast ATD ball track and the broadcast homography's `valid` column, to fill
+  tactical ball gaps (`solution/broadcast.py`). The broadcast is not synchronised to the tactical
+  timeline, but both ATD files share pitch coordinates, so we align them from the tracking alone:
+  - The broadcast is cut into 10 s windows. Each window with enough visible ball is matched to the
+    tactical offset at which the two ball tracks agree (coarse search every 5 frames over the
+    whole match, refined to one frame). A window matches when the median ball distance is
+    ≤ 1 m: 207 of 657 windows, median distance **0.53 m**, at only 7 distinct offsets that
+    increase monotonically — the broadcast's cuts.
+  - The offset is piecewise constant, so an unmatched window between two matched windows with
+    the same offset inherits it — **unless its own data contradicts it**: if enough ball is seen
+    in both recordings and the median distance at that offset is above 1 m, it is rejected. A
+    first version without that check was tested label-free on the inherited windows that could
+    be checked, gave a median distance of 2.07 m, and was replaced. With it, 222 windows are
+    inherited and 143 rejected.
+  - Where the tactical ball is missing and the mapped broadcast frame has a ball and a valid
+    homography (no replay, close-up or crowd shot), the broadcast position is used: 5,700 frames.
+    The ball is visible on **62.9%** of graded frames instead of 59.3%. All downstream evidence
+    treats these frames as seen.
+- **Dropped:** broadcast video and broadcast player tracks (the tactical player tracks already
+  cover the whole pitch), tactical homography and tactical video. Our method works entirely on
+  pitch coordinates, which the ATD already provides. Re-detecting the ball from video is the
+  obvious next step (see §6) but was out of scope.
 
 ## 4. Training data and use of ground truth
 
@@ -120,10 +137,15 @@ No match data was sent to any third-party or cloud-hosted LLM.
 
 ## 6. Limitations and what we would do next
 
-- **Ball invisible on ~41% of graded frames.** Through long gaps the decoder can only carry the
-  last state forward and the team-shape evidence, which is weak and lags. A turnover that happens
-  entirely while the ball is unseen is still often detected late. Next step: re-detect the ball in
-  the tactical video with a small detector and project it with the homography.
+- **Ball invisible on ~41% of graded frames** (~37% after filling from the broadcast — the
+  broadcast tends to lose the ball in the same situations, and cuts to replays at exactly the
+  moments that matter). Through long gaps the decoder can only carry the last state forward and
+  the team-shape evidence, which is weak and lags. A turnover that happens entirely while the ball
+  is unseen is still often detected late. Next step: re-detect the ball in the tactical video with
+  a small detector and project it with the homography.
+- **Broadcast alignment is per 10 s window.** A cut inside a window is not located precisely, and
+  the two ball tracks differ by ~0.5 m, which slightly perturbs ball speed where the two sources
+  meet.
 - **Aerial balls.** The ATD ball position is a ground projection, so a high ball appears near
   players it is far above. Ball speed gating removes part of this, not all of it.
 - **Dead-ball timing** relies on collective slowdown, which lags the whistle by a second or more,
@@ -144,7 +166,9 @@ python -m solution.run --team Novara
 python evaluation/validate_submission.py evaluation/results/Novara.csv
 ```
 
-Runtime is under a minute on a laptop. The method is fully deterministic: no randomness, no
+Runtime is about 2.5 minutes on a laptop, most of it the broadcast alignment (set
+`USE_BROADCAST = False` in `solution/config.py` to skip it; without the broadcast files in
+`data/broadcast/` it is skipped automatically, and the result then differs). The method is fully deterministic: no randomness, no
 training. The same data produces the same file byte for byte.
 
 Optional mechanics check without the data:
@@ -156,6 +180,7 @@ python evaluation/run_evaluation.py --gt /tmp/synth/synthetic_gt.csv --results /
 ```
 
 Code layout: `solution/atd.py` (tracking reader), `solution/features.py` (per-frame features and
-self-calibration), `solution/tagging.py` (Smart Tagging), `solution/model.py` (evidence and
+self-calibration), `solution/tagging.py` (Smart Tagging), `solution/broadcast.py` (broadcast
+alignment and ball fill), `solution/model.py` (evidence and
 Viterbi decoder), `solution/config.py` (every parameter, with its rationale), `solution/run.py`
 (entry point).

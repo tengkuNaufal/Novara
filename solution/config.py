@@ -19,6 +19,14 @@ BALL_MAX_GAP = 8
 # the longer the ball was unseen, the less a straight line between its two sightings says about
 # where it actually was.
 BALL_MAX_GAP_LONG = 38
+# Broadcast ball as a second source (solution/broadcast.py). Timelines are aligned in 10 s windows
+# by matching the two ball tracks; a window matches when the median ball distance is under 1 m
+# (tracking noise is ~0.5 m). Used only where the tactical ball is missing.
+USE_BROADCAST = True
+BC_WINDOW = 250
+BC_STEP = 5
+BC_MIN_COMMON = 20
+BC_MATCH_M = 1.0
 # A ball counts as "out of the pitch" when it is this many metres beyond a line.
 OUT_MARGIN_M = 1.0
 
