@@ -33,6 +33,7 @@ OUT_MARGIN_M = 1.0
 # -- control evidence --------------------------------------------------------------------------
 # A player "controls" the ball when within roughly CONTROL_RADIUS_M metres of it. The sigmoid width
 # softens the edge because tracking positions of player and ball both carry ~0.5 m of noise.
+# training/tune.py (Metrica sample games) preferred 1.2; not adopted -- see P_SWITCH below.
 CONTROL_RADIUS_M = 1.8
 CONTROL_SOFT_M = 0.4
 # A ball moving faster than this is in flight (pass, shot, clearance): a player near its path is
@@ -92,6 +93,12 @@ RESTART_SLOW_MS = 1.5
 # when the new team shows about half a second more control than the old one -- which is what
 # "controlled possession" means in CHALLENGE.md: a touch, a deflection or a lost aerial duel is
 # not enough.
+# Experiment, not adopted: training/tune.py fitted this on two OTHER games (Metrica public sample
+# data, leave-one-game-out) and preferred 4 (held-out spellF1 0.524 -> 0.572 and 0.472 -> 0.506).
+# Those labels come from event data, where every recovery is a change of possession; the
+# challenge's definition is stickier (touches without control do not count) -- event-derived
+# possessions last 10-12 s there against 14.2 s in the public ground truth -- and that tracking is
+# much cleaner than ours, where a low switching cost turns noise into false turnovers. We kept 12.
 P_SWITCH = 12.0
 # Cost of entering or leaving a dead-ball stretch.
 P_DEAD = 10.0

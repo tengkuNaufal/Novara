@@ -106,9 +106,42 @@ only their dead/alive timing.
 
 ## 4. Training data and use of ground truth
 
-**No labelled data of any kind was used.** The method has no trained parameters. All weights in
+**The submitted file uses no labelled data.** The method has no trained parameters. All weights in
 `solution/config.py` are set from physical and football reasoning (control radius, pass speed,
-seconds of evidence), and the one data-dependent threshold is estimated without labels (§2).
+seconds of evidence), and the data-dependent thresholds are estimated without labels (§2).
+
+**One experiment with labelled data from other games, not adopted.**
+
+- *Dataset:* Metrica Sports' public sample data
+  (<https://github.com/metrica-sports/sample-data>), sample games 1 and 2 — tracking of players and
+  ball at 25 fps, and event data produced by Metrica. About 282,000 graded frames and 665
+  possessions. Nothing from the provided game.
+- *Labels:* derived by us from those events (`training/metrica.py`). The team of the latest pass,
+  recovery, set piece or shot has the ball; play is dead from a ball out, a shot out or in, or a
+  foul until the next restart.
+- *Domain gap, simulated:* the sample tracking is clean, so we degraded it to resemble ours. The
+  ball is removed in long blocks with our match's own mean gap lengths (17 s missing, 25 s
+  visible), positions get 0.3 m noise, and players drop out. Set-piece windows like Smart Tagging
+  are simulated from the set-piece events.
+- *Why only the team side:* that tracking blanks the ball on 92–100% of dead frames, which makes
+  "ball missing" a false shortcut to a dead ball. So the true dead frames were given to the
+  decoder, and only the team-side parameters were fitted (`training/tune.py`), on the official
+  spellF1, leave one game out.
+- *Result:* `P_SWITCH` 4 instead of 12 (and a 1.2 m control radius). On each held-out game,
+  spellF1 rose from 0.524 to 0.572 and from 0.472 to 0.506, with a plateau over 3–6 on each game.
+- *Why we kept 12:*
+  1. The labels mean something different. In event data every recovery is a change of possession,
+     while the challenge's definition is stickier: touches without control do not count.
+     Event-derived possessions last 10–12 s, against 14.2 s in the public ground truth. That gap
+     alone pushes the fit toward a lower switching cost.
+  2. The sample tracking has no identity switches or team-assignment errors. In ours, a low
+     switching cost turns tracking noise into false turnovers: 293 possessions over the match
+     instead of 220.
+  3. For transparency, the public five minutes also scored the fitted version lower (spellF1
+     0.503 → 0.367, macroF1 0.811 → 0.781). That is within its stated noise band and was not the
+     reason, but it did not contradict the two above.
+
+  The code is in `training/` so the experiment can be rerun and extended.
 
 The public five-minute ground truth was used only to check that the pipeline is correct: frame
 alignment, file format and label meaning. No parameter was chosen by comparing scores on it, and

@@ -26,6 +26,27 @@ from solution import atd, broadcast, config as C, features, model, tagging  # no
 LETTERS = np.array(["H", "A", "D"])
 
 
+def label_track(track, slot_team, team_names, events, blocks, pitch, n_frames):
+    """The method itself, independent of where the tracking came from: (labels, features, tag
+    summary). `blocks` is [(half, first, last)]; frames outside them are written X."""
+    graded = np.zeros(n_frames, dtype=bool)
+    for _, first, last in blocks:
+        graded[first:last + 1] = True
+
+    feat = features.compute(track, slot_team, pitch, graded)
+    E, tag_summary = model.emissions(feat, events, team_names, n_frames)
+    kickoffs = tag_summary.pop("kickoff_start_frames")
+    tag_summary["pre_kickoff_dead_frames"] = sum(
+        model.dead_before_kickoff(E, first, last, kickoffs) for _, first, last in blocks)
+
+    labels = np.full(n_frames, "X", dtype="<U1")
+    for _, first, last in blocks:
+        path = model.viterbi(E[first:last + 1])
+        path = model.recentre_switches(path, E[first:last + 1], ~feat["seen_raw"][first:last + 1])
+        labels[first:last + 1] = LETTERS[path]
+    return labels, feat, tag_summary
+
+
 def predict(data_dir=None, verbose=True):
     """Label array (strings, one per video frame) and a diagnostics dict."""
     t0 = time.time()
@@ -53,22 +74,10 @@ def predict(data_dir=None, verbose=True):
             _, bc_stats = broadcast.fill_ball(track, b_track, broadcast.read_valid(b_hom, nb))
             bc_stats["broadcast_used"] = True
 
-    graded = np.zeros(n_frames, dtype=bool)
-    for _, first, last in blocks:
-        graded[first:last + 1] = True
-
-    feat = features.compute(track, slot_team, pitch, graded)
     events = tagging.load(tags_path, C.FPS)
-    E, tag_summary = model.emissions(feat, events, team_names, n_frames)
-    kickoffs = tag_summary.pop("kickoff_start_frames")
-    tag_summary["pre_kickoff_dead_frames"] = sum(
-        model.dead_before_kickoff(E, first, last, kickoffs) for _, first, last in blocks)
-
-    labels = np.full(n_frames, "X", dtype="<U1")
-    for _, first, last in blocks:
-        path = model.viterbi(E[first:last + 1])
-        path = model.recentre_switches(path, E[first:last + 1], ~feat["seen_raw"][first:last + 1])
-        labels[first:last + 1] = LETTERS[path]
+    labels, feat, tag_summary = label_track(track, slot_team, team_names, events, blocks,
+                                            pitch, n_frames)
+    graded = labels != "X"
 
     diag = {
         "seconds": round(time.time() - t0, 1),
