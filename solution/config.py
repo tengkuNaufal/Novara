@@ -96,9 +96,10 @@ RESTART_SLOW_MS = 1.5
 # Experiment, not adopted: training/tune.py fitted this on two OTHER games (Metrica public sample
 # data, leave-one-game-out) and preferred 4 (held-out spellF1 0.524 -> 0.572 and 0.472 -> 0.506).
 # Those labels come from event data, where every recovery is a change of possession; the
-# challenge's definition is stickier (touches without control do not count) -- event-derived
-# possessions last 10-12 s there against 14.2 s in the public ground truth -- and that tracking is
-# much cleaner than ours, where a low switching cost turns noise into false turnovers. We kept 12.
+# challenge's definition is stickier (touches without control do not count). And that tracking is
+# much cleaner than ours, where a low switching cost turns noise into false turnovers: 293
+# possessions over our match at 4 against 218 at 12, without labels. We kept 12. Full account,
+# including what the public window showed, in TECHNICAL_REPORT.md section 4.
 P_SWITCH = 12.0
 # Cost of entering or leaving a dead-ball stretch.
 P_DEAD = 10.0

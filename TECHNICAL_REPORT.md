@@ -130,27 +130,53 @@ seconds of evidence), and the data-dependent thresholds are estimated without la
 - *Result:* `P_SWITCH` 4 instead of 12 (and a 1.2 m control radius). On each held-out game,
   spellF1 rose from 0.524 to 0.572 and from 0.472 to 0.506, with a plateau over 3–6 on each game.
 - *Why we kept 12:*
-  1. The labels mean something different. In event data every recovery is a change of possession,
-     while the challenge's definition is stickier: touches without control do not count.
-     Event-derived possessions last 10–12 s, against 14.2 s in the public ground truth. That gap
-     alone pushes the fit toward a lower switching cost.
+  1. The labels mean something different. In event data every recovery is a change of possession.
+     CHALLENGE.md's definition is stickier: a change needs the opponent to gain *controlled*
+     possession, and touches without control, deflections and lost aerial duels do not count.
+     Fitting to event-derived labels therefore pushes toward a lower switching cost.
   2. The sample tracking has no identity switches or team-assignment errors. In ours, a low
-     switching cost turns tracking noise into false turnovers: 293 possessions over the match
-     instead of 220.
-  3. For transparency, the public five minutes also scored the fitted version lower (spellF1
-     0.503 → 0.367, macroF1 0.811 → 0.781). That is within its stated noise band and was not the
-     reason, but it did not contradict the two above.
+     switching cost turns tracking noise into false turnovers. Without labels, on our match,
+     `P_SWITCH = 4` gives 293 possessions, against 218 at 12.
+  3. *Supporting only:* event-derived possessions last 10–12 s, against 14.2 s in the public ground
+     truth, a statistic the organisers publish in DATA.md.
+  4. The public five minutes also scored the fitted version lower (spellF1 0.503 → 0.367, macroF1
+     0.811 → 0.781). We saw this before deciding, so it cannot be ruled out as an influence.
 
   The code is in `training/` so the experiment can be rerun and extended.
 
-The public five-minute ground truth was used only to check that the pipeline is correct: frame
-alignment, file format and label meaning. No parameter was chosen by comparing scores on it, and
-no variant was kept or dropped for its score. Each change in §2 was decided on football or
-technical grounds; the public score was read once per version as a regression check, and the one
-time it dropped sharply (first team-shape version) the cause was diagnosed with label-free
-statistics, not by trying values. For
-testing, `solution/synthetic.py` generates a fake match in the real file formats, with its own
-ground truth. That checks the mechanics end to end. Its score says nothing about the real match.
+**Use of the public five-minute ground truth — what actually happened.** It was used to check that
+the pipeline is correct: frame alignment, file format and label meaning. No parameter value was
+searched or chosen by comparing scores on it. EVALUATION.md also asks that it never be used to
+choose between two versions. We did read it once per version as a regression check, and in three
+decisions it was in front of us:
+
+1. **First team-shape version.** Its score dropped sharply, which prompted an investigation. The
+   two defects were found with label-free statistics (§2) and fixed for those reasons.
+2. **Rejecting the Metrica-fitted `P_SWITCH`** (point 4 above).
+3. **Choosing this pipeline over a teammate's alternative.** A teammate built a separate rule-based
+   pipeline. The comparison used its public score among other things. The label-free comparison
+   alone supports the same choice:
+   - the two pipelines agree on the team in possession on 92% of frames where both say the ball is
+     alive;
+   - the alternative left 714 graded frames as `X`;
+   - swapping the two dead-ball masks shows our team side is the stronger one regardless of which
+     mask it is given.
+
+   We report the choice here rather than claim it was made blind.
+
+For the record, the public-window figures with paired bootstrap (5,000 draws, the official
+possession resampling): spellF1 minus the teammate's pipeline +0.22 (95% CI −0.02 to +0.46), minus
+`baseline_smooth50` +0.18 (CI +0.004 to +0.36), minus `baseline_smooth125` +0.08 (CI −0.05 to
++0.21). On 17 possessions none of this is conclusive. The organisers note that this window ranks
+the baselines differently from the full match.
+
+**Robustness without labels.** Scaling the dead-ball weights by ±25% (`W_OUT`, `W_SLOW`,
+`P_DEAD`) changes at most 1.5% of graded frames. The dead share stays within 50.6–52.0%, dead
+stretches within 106–122, and possessions within 212–223.
+
+**Synthetic data.** For testing, `solution/synthetic.py` generates a fake match in the real file
+formats, with its own ground truth. That checks the mechanics end to end. Its score says nothing
+about the real match.
 
 No match data was sent to any third-party or cloud-hosted LLM.
 
@@ -184,7 +210,13 @@ No match data was sent to any third-party or cloud-hosted LLM.
   players it is far above. Ball speed gating removes part of this, not all of it.
 - **Dead-ball timing** relies on collective slowdown, which lags the whistle by a second or more,
   and can misfire during very slow build-up. Ball-out detection is only as good as the ball track
-  near the lines.
+  near the lines. The ball is often unseen as it goes out, so in practice ball-out evidence rarely
+  decides a dead ball on its own: ±25% on its weight changes no frame. 16 dead stretches are
+  shorter than 5 s (0.7% of graded frames). Half of them have the same team on both sides and are
+  probably false. A minimum dead-ball duration would remove them.
+- **Interpolated ball speed.** Across an interpolated gap (up to 1.5 s) the ball moves in a
+  straight line at constant speed, which is not its real speed. The effect is small, because
+  evidence from such frames is weighted down with the gap length.
 - **Weights are reasoned, not fitted.** With labelled tracking from other matches, the same
   decoder could have its emission weights learned (a hidden semi-Markov model with learned
   duration distributions would be the natural upgrade).
@@ -193,9 +225,14 @@ No match data was sent to any third-party or cloud-hosted LLM.
 
 ## 7. Reproduction
 
+Environment used for the submitted file: **Python 3.11.9, numpy 2.4.6, pandas 3.1.1**
+(Windows 11). The submitted `Novara.csv` was produced by the code at commit **`4b595ad`** of
+<https://github.com/tengkuNaufal/Novara> (later commits change only documentation and code comments; rerunning them gives the same file), and has
+SHA-256 `e49aec949eb599f9f17a6072f2e10cd98d86a681e8d64452f31e37881cd9eaf2`.
+
 ```bash
 pip install -r requirements-solution.txt
-# unpack the match bundle into ./data (or set MTAH_DATA_DIR)
+# unpack the match bundle into ./data (or set MTAH_DATA_DIR), including data/broadcast/
 python -m solution.run --team Novara
 python evaluation/validate_submission.py evaluation/results/Novara.csv
 ```
@@ -203,7 +240,9 @@ python evaluation/validate_submission.py evaluation/results/Novara.csv
 Runtime is about 2.5 minutes on a laptop, most of it the broadcast alignment (set
 `USE_BROADCAST = False` in `solution/config.py` to skip it; without the broadcast files in
 `data/broadcast/` it is skipped automatically, and the result then differs). The method is fully deterministic: no randomness, no
-training. The same data produces the same file byte for byte.
+training. In the pinned environment above, the same data produces the same file byte for byte,
+which we checked by rerunning. Other Python, numpy or pandas versions run the same code, but we
+only claim byte-identical output for the pinned environment.
 
 Optional mechanics check without the data:
 
