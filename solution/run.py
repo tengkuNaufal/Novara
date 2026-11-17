@@ -60,6 +60,9 @@ def predict(data_dir=None, verbose=True):
     feat = features.compute(track, slot_team, pitch, graded)
     events = tagging.load(tags_path, C.FPS)
     E, tag_summary = model.emissions(feat, events, team_names, n_frames)
+    kickoffs = tag_summary.pop("kickoff_start_frames")
+    tag_summary["pre_kickoff_dead_frames"] = sum(
+        model.dead_before_kickoff(E, first, last, kickoffs) for _, first, last in blocks)
 
     labels = np.full(n_frames, "X", dtype="<U1")
     for _, first, last in blocks:

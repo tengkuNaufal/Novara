@@ -112,8 +112,22 @@ def emissions(feat, events, team_names, n_frames):
     E[:, A] -= C.W_TAG * tag_team
 
     summary = {"phase_tags_used": n_phase, "set_pieces_used": n_setpiece,
-               "goals_used": n_goal}
+               "goals_used": n_goal,
+               "kickoff_start_frames": [r for r, typ in restarts if typ == tagging.KICKOFF_START]}
     return E, summary
+
+
+def dead_before_kickoff(E, first, last, kickoff_frames):
+    """A half's graded window can open before its kick-off (FAQ.md). Everything from the start of
+    the window to the detected kick-off restart is a dead ball. The kick-off comes from the Smart
+    Tagging "Kick Off (Start)" set piece, found in the half's own window -- no frame is hard-coded.
+    Returns the number of frames covered."""
+    covered = 0
+    for r in kickoff_frames:
+        if first < r <= last:
+            E[first:r, D] += C.W_PRE_KICKOFF
+            covered += r - first
+    return covered
 
 
 def recentre_switches(path, E, missing, tol=None):

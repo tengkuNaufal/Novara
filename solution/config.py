@@ -78,6 +78,9 @@ W_MISSING = 0.08
 W_LIVE = 0.3
 # Inside a tagged set piece, before the detected restart: dead. Just after it: alive.
 W_SET_PIECE = 0.8
+# From the start of a half's graded window to its tagged "Kick Off (Start)": the game has not
+# begun, so the ball is dead. Strong enough to decide on its own.
+W_PRE_KICKOFF = 5.0
 # After a tagged goal, until the following kick-off.
 W_AFTER_GOAL = 1.5
 # Restart detection inside a set-piece tag: the ball must go from slow to fast.

@@ -21,6 +21,7 @@ PHASE_SIGN = {
 SET_PIECE = "set pieces"
 GOAL = "goals"
 KICKOFF_AFTER_GOAL = "kick off (after goal)"
+KICKOFF_START = "kick off (start)"
 
 
 def load(path, fps):

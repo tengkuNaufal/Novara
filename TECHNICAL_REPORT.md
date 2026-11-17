@@ -46,6 +46,7 @@ training or validation, and we had no labelled data from other games.
 | Smart Tagging, phases | team tag of attacking phases (possessor) and defending/defensive-transition phases (non-possessor) | weak team prior, 0.03 per frame |
 | Smart Tagging, set pieces | restart detected inside the tag as the ball going from slow to fast | `D` before the restart, `not D` and a small bonus for the tagged team after |
 | Smart Tagging, goals | from the goal until the following "Kick Off (After Goal)" | `D` |
+| Smart Tagging, kick-offs | from the start of a half's graded window to the restart detected in that half's "Kick Off (Start)" tag | strong `D` — the second half's graded window opens before its kick-off (FAQ.md); found from the tag, no frame hard-coded |
 
 **Tracking clean-up.** Ball gaps of up to 8 frames (0.32 s) are filled by linear interpolation.
 Gaps up to 38 frames (1.5 s) are also interpolated, but only for the control evidence and with a
